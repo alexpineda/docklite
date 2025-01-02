@@ -33,10 +33,10 @@ jobs:
       - name: Build image
         working-directory: services/${{ matrix.service }}
         run: |
-          docker build -t ${{ env.REGISTRY }}/${{ matrix.service }}:${{ github.sha }} .
-          docker tag ${{ env.REGISTRY }}/${{ matrix.service }}:${{ github.sha }} ${{ env.REGISTRY }}/${{ matrix.service }}:latest
+          docker build -t ${{ vars.REGISTRY }}/${{ matrix.service }}:${{ github.sha }} .
+          docker tag ${{ vars.REGISTRY }}/${{ matrix.service }}:${{ github.sha }} ${{ vars.REGISTRY }}/${{ matrix.service }}:latest
 
       - name: Push image
         run: |
-          docker push ${{ env.REGISTRY }}/${{ matrix.service }}:${{ github.sha }}
-          docker push ${{ env.REGISTRY }}/${{ matrix.service }}:latest 
+          docker push ${{ vars.REGISTRY }}/${{ matrix.service }}:${{ github.sha }}
+          docker push ${{ vars.REGISTRY }}/${{ matrix.service }}:latest 
