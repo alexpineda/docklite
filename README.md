@@ -18,12 +18,22 @@
 ## Deployment
 1. Services are deployed via:
    ```bash
-   ./deploy-api.sh <docker-image> <domain>
+   ./deploy-api.sh <docker-image> [--full-redeploy]
    ```
+   Example:
+   ```bash
+   ./deploy-api.sh registry.digitalocean.com/api-alexpineda-containers/my-api:latest
+   ```
+
 2. Each service should:
    - Expose port 3000
-   - Be available as a Docker image
+   - Be available in the Docker registry
    - Support health checks
+
+3. Service names and domains are automatically derived from the image name:
+   - Image: `registry.digitalocean.com/api-alexpineda-containers/my-api:latest`
+   - Service name: `my-api`
+   - Domain: `my-api.{BASE_DOMAIN}`
 
 ## Dashboard
 - Runs locally on Mac
@@ -32,11 +42,10 @@
 - Access at http://localhost:3000
 
 ## Configuration
-- Services are tracked in vars/services.yml
+- Services are discovered from Docker registry
 - Each service needs:
-  - name: derived from domain
-  - image: Docker image
-  - domain: service domain 
+  - To be pushed to the registry
+  - Follow naming convention: `registry.digitalocean.com/api-alexpineda-containers/{service-name}:latest`
 
 ## Security and Configuration
 

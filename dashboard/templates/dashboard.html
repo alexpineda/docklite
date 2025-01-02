@@ -6,6 +6,29 @@
 {% endif %}
 
 <div class="container mt-4">
+    <div class="card mb-4">
+        <div class="card-body">
+            <h2 class="card-title">Server Management</h2>
+            <p class="text-muted">Manage server infrastructure including Docker, Caddy, and system dependencies.</p>
+            <div class="btn-group">
+                <button type="button" class="btn btn-primary" onclick="redeployServer()" {% if not docker_available %}disabled{% endif %}>
+                    Full Server Redeploy
+                </button>
+                <button type="button" class="btn btn-secondary" onclick="deployAllServices()" {% if not docker_available %}disabled{% endif %}>
+                    Deploy All Services
+                </button>
+            </div>
+            <div class="mt-2">
+                <small class="text-muted d-block">
+                    <strong>Full Server Redeploy:</strong> ⚠️ Updates infrastructure (Docker, Caddy) and all services. Use with caution.
+                </small>
+                <small class="text-muted d-block">
+                    <strong>Deploy All Services:</strong> Only redeploys API services without modifying infrastructure.
+                </small>
+            </div>
+        </div>
+    </div>
+
     <h2>API Services</h2>
     
     {% if services %}
@@ -47,6 +70,9 @@
                             <button type="button" class="btn btn-info btn-sm" onclick="deployService('{{ service.name }}')" {% if not docker_available %}disabled{% endif %}>
                                 {% if service.deployed %}Redeploy{% else %}Deploy{% endif %}
                             </button>
+                            <form action="{{ url_for('delete_service', name=service.name) }}" method="POST" style="display: inline;" onsubmit="return confirm('Are you sure you want to delete this service? This action cannot be undone.')">
+                                <button type="submit" class="btn btn-danger btn-sm" {% if not service.deployed %}disabled{% endif %}>Delete</button>
+                            </form>
                         </div>
                     </td>
                 </tr>
@@ -92,7 +118,10 @@
                     </td>
                     <td>
                         <form action="{{ url_for('shutdown_service', name=container.name) }}" method="POST" style="display: inline;">
-                            <button type="submit" class="btn btn-danger btn-sm">Remove</button>
+                            <button type="submit" class="btn btn-danger btn-sm">Shutdown</button>
+                        </form>
+                        <form action="{{ url_for('delete_service', name=container.name) }}" method="POST" style="display: inline;" onsubmit="return confirm('Are you sure you want to delete this container? This action cannot be undone.')">
+                            <button type="submit" class="btn btn-danger btn-sm">Delete</button>
                         </form>
                     </td>
                 </tr>
@@ -113,13 +142,13 @@
         <h3>Add New Service</h3>
         <form action="{{ url_for('deploy') }}" method="POST">
             <div class="mb-3">
-                <label for="image" class="form-label">Docker Image</label>
-                <input type="text" class="form-control" id="image" name="image" required>
+                <label for="image" class="form-label" >Docker Image</label>
+                <input type="text" class="form-control" id="image" name="image" required placeholder="registry.digitalocean.com/api-alexpineda-containers/bun-example-api">
             </div>
             <div class="mb-3">
                 <label for="domain" class="form-label">Domain</label>
                 <div class="input-group">
-                    <input type="text" class="form-control" id="domain" name="domain" required>
+                    <input type="text" class="form-control" id="domain" name="domain" required placeholder="bun-example">
                     <span class="input-group-text">.{{ base_domain }}</span>
                 </div>
             </div>
@@ -131,6 +160,18 @@
 <script>
 function deployService(name) {
     window.location.href = `/stream-deploy-service?name=${name}`;
+}
+
+function redeployServer() {
+    if (confirm('Are you sure you want to perform a full server redeploy? This will update all infrastructure components.')) {
+        window.location.href = '/stream-deploy';
+    }
+}
+
+function deployAllServices() {
+    if (confirm('Are you sure you want to redeploy all API services?')) {
+        window.location.href = '/stream-deploy-services';
+    }
 }
 </script>
 

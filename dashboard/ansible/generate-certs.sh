@@ -6,7 +6,7 @@ if [ -f .env ]; then
 fi
 
 # Create a temporary directory for certificates
-CERT_DIR="./dashboard/certs"
+CERT_DIR="./certs"
 rm -rf $CERT_DIR
 mkdir -p $CERT_DIR
 

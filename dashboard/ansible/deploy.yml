@@ -7,6 +7,13 @@
     - vars/domain.yml
 
   tasks:
+    - name: Ensure host directories exist for each service
+      file:
+        path: "/srv/docker/{{ item.name }}"
+        state: directory
+        mode: '0755'
+      loop: "{{ api_services }}"
+
     - name: Deploy API services
       community.docker.docker_container:
         name: "{{ item.name }}"
@@ -17,6 +24,8 @@
           - name: "{{ docker_network }}"
         exposed_ports:
           - "3000"
+        volumes:
+          - "/srv/docker/{{ item.name }}:/var/lib/app_data"
       loop: "{{ api_services }}"
 
     - name: Configure Caddy for each service
@@ -35,7 +44,6 @@
 
           import /etc/caddy/conf.d/*
 
-          {{ caddy_reverse_proxies }}
         dest: /etc/caddy/Caddyfile
       notify: reload caddy
 

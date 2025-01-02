@@ -1,0 +1,42 @@
+name: Build and Push Docker Images
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'services/**'  # Assuming services are in a services directory
+  workflow_dispatch:  # Allow manual triggers
+
+env:
+  REGISTRY: "registry.digitalocean.com/api-alexpineda-containers"
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service:
+          - bun-example-api  # Add more services here as needed
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Install doctl
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+
+      - name: Log in to DO Container Registry
+        run: doctl registry login --expiry-seconds 600
+
+      - name: Build image
+        working-directory: services/${{ matrix.service }}
+        run: |
+          docker build -t ${{ env.REGISTRY }}/${{ matrix.service }}:${{ github.sha }} .
+          docker tag ${{ env.REGISTRY }}/${{ matrix.service }}:${{ github.sha }} ${{ env.REGISTRY }}/${{ matrix.service }}:latest
+
+      - name: Push image
+        run: |
+          docker push ${{ env.REGISTRY }}/${{ matrix.service }}:${{ github.sha }}
+          docker push ${{ env.REGISTRY }}/${{ matrix.service }}:latest 

@@ -9,17 +9,20 @@
 ## Project Structure
 ```
 ├── dashboard/           # Local monitoring dashboard (runs on Mac)
+│   └── deploy.py           # Ansible deployment script
+│   └── app.py
 ├── vars/               # Ansible variables
 ├── templates/          # Ansible templates
 │   └── caddy/         # Caddy reverse proxy configs
-└── deploy-api.sh      # Main deployment script
 ```
 
 ## Deployment
+1. Images are deployed to DigitalOcean container registry
+- This may change to Github as we need Github actions to build the images
+- We list the images in 
 1. Services are deployed via:
-   ```bash
-   ./deploy-api.sh <docker-image> <domain>
-   ```
+   deploy.py
+   we write to vars/services.yml and var/domain.yml so that the ansible playbook.yml and deploy.yml can use them
 2. Each service should:
    - Expose port 3000
    - Be available as a Docker image
@@ -28,12 +31,12 @@
 ## Dashboard
 - Runs locally on Mac
 - Connects to remote Docker daemon
-- Requires TLS certificates in ~/.docker/machine/certs/
+- Requires TLS certificates in dashboard/certs/
 - Access at http://localhost:3000
 
 ## Configuration
 - Services are tracked in vars/services.yml
 - Each service needs:
-  - name: derived from domain
-  - image: Docker image
-  - domain: service domain 
+  - name: derived from domain eg. bun-example-api
+  - image: Docker image eg. registry.digitalocean.com/api-alexpineda-containers/bun-example-api:latest
+  - domain: service domain eg. bun-example-api.api.alexpineda.ca
