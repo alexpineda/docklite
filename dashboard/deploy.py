@@ -73,6 +73,30 @@ def run_ansible(env, full_redeploy=False):
         if os.path.exists('inventory.yml'):
             os.remove('inventory.yml')
 
+def check_container_status(env, container_name):
+    """Check Docker container status and logs"""
+    try:
+        # Check container status
+        status_cmd = f"docker ps -a --filter name={container_name} --format '{{{{.Status}}}}'"
+        status = subprocess.run(['ssh', f"{env['DROPLET_USER']}@{env['DROPLET_IP']}", status_cmd], 
+                              capture_output=True, text=True, check=True).stdout.strip()
+        
+        # Get recent logs
+        logs_cmd = f"docker logs --tail 50 {container_name} 2>&1"
+        logs = subprocess.run(['ssh', f"{env['DROPLET_USER']}@{env['DROPLET_IP']}", logs_cmd],
+                            capture_output=True, text=True, check=True).stdout.strip()
+        
+        print(f"\nContainer Status: {status}")
+        print("\nRecent Logs:")
+        print(logs)
+        
+        return "Up" in status
+    except subprocess.CalledProcessError as e:
+        print(f"\nError checking container: {str(e)}")
+        if e.stderr:
+            print(f"Error output: {e.stderr}")
+        return False
+
 def main():
     if len(sys.argv) < 2 or len(sys.argv) > 3:
         print("Usage: ./deploy.py <docker-image> [--full-redeploy]")
@@ -82,13 +106,22 @@ def main():
     image = sys.argv[1]
     full_redeploy = '--full-redeploy' in sys.argv
     env = load_env()
+    container_name = get_subdomain_from_image(image)
     
     try:
         update_domain_yaml(env)
-        run_ansible(env, full_redeploy)
-        print("Deployment successful!")
+        if not run_ansible(env, full_redeploy):
+            print("Service deployment failed")
+            sys.exit(1)
+            
+        print("\nChecking container status...")
+        if not check_container_status(env, container_name):
+            print("Service deployment failed - container is not running properly")
+            sys.exit(1)
+            
+        print("Service deployment successful!")
     except Exception as e:
-        print(f"Deployment failed: {str(e)}")
+        print(f"Service deployment failed: {str(e)}")
         sys.exit(1)
 
 if __name__ == '__main__':

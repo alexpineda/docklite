@@ -744,6 +744,34 @@ def container_stats(name):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/container-logs/<name>')
+def container_logs(name):
+    if not client:
+        return jsonify({'error': 'Docker not available'}), 500
+        
+    try:
+        container = client.containers.get(name)
+        status = container.status
+        logs = container.logs(tail=100, timestamps=True).decode('utf-8')
+        
+        # Add container inspection info
+        inspect = container.attrs
+        status_details = {
+            'status': status,
+            'state': inspect['State'],
+            'platform': inspect['Platform'],
+            'created': inspect['Created'],
+            'started_at': inspect['State'].get('StartedAt'),
+            'health': inspect['State'].get('Health', {}).get('Status', 'N/A')
+        }
+        
+        return jsonify({
+            'status': f"Status: {status}\nHealth: {status_details['health']}\nStarted: {status_details['started_at']}\nPlatform: {status_details['platform']}",
+            'logs': logs
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 if __name__ == '__main__':
     print(f"Connecting to Docker at {DOCKER_HOST}")
     if not client:
