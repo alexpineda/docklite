@@ -27,7 +27,7 @@
         const status = document.getElementById('status');
         let completed = false;
 
-        const eventSource = new EventSource("{{ url_for('stream_deploy_service', name=service_name) if service_name else url_for('stream_deploy') }}");
+        const eventSource = new EventSource("{{ url_for('deploy_container', name=service_name) if service_name else url_for('deploy_all_containers') }}");
         
         eventSource.onmessage = function(event) {
             const line = event.data;

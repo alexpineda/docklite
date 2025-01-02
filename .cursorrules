@@ -15,7 +15,7 @@ dashboard/ - gui and scripts for deploying containers
 - deploy.py    - python script to deploy containers
 - templates/   - html templates
 dashboard/ansible
-- deploy.yml     - deploy any containers in services.yml
+- deploy.yml     - deploy any containers in services_to_deploy.yml
 - playbook.yml   - deploy required services (docker, caddy, etc)
 - vars/          - ansible variables written by deploy.py
 - templates/     - caddy templates
@@ -33,7 +33,7 @@ dashboard/ansible
      - Redeploy all containers
      - Redeploy a single container
      - Deploy a new container based on a registry image
-   we write to vars/services.yml and var/domain.yml so that the ansible playbook.yml and deploy.yml can use them
+   we write to vars/services_to_deploy.yml and var/domain.yml so that the ansible playbook.yml and deploy.yml can use them
 2. Each container should:
    - Expose port 3000
    - Be available as a Docker image
@@ -46,7 +46,7 @@ dashboard/ansible
 - Access at http://localhost:3000
 
 ## Configuration
-- Services are tracked in vars/services.yml
+- Services are tracked in vars/services_to_deploy.yml
 - Each service needs:
   - name: derived from domain eg. bun-example-api
   - image: Docker image eg. registry.digitalocean.com/api-alexpineda-containers/bun-example-api:latest

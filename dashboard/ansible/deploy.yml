@@ -3,7 +3,7 @@
   hosts: api_server
   become: yes
   vars_files:
-    - vars/services.yml
+    - vars/services_to_deploy.yml
     - vars/domain.yml
   vars:
     docker_network: api_network
@@ -37,6 +37,7 @@
         volumes:
           - "/srv/docker/{{ item.name }}:/var/lib/app_data"
         platform: "linux/amd64"
+        env: "{{ item.env_vars }}"
       loop: "{{ api_services }}"
 
     - name: Configure Caddy for each service

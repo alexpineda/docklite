@@ -3,7 +3,6 @@
   hosts: api_server
   become: yes
   vars_files:
-    - vars/services.yml
     - vars/domain.yml
 
   tasks:

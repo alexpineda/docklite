@@ -1,10 +1,6 @@
-name: Build and Push Docker Images
+name: Build and Push Docker Images Example
 
 on:
-  push:
-    branches: [ main ]
-    paths:
-      - 'services/**'  # Assuming services are in a services directory
   workflow_dispatch:  # Allow manual triggers
 
 env:

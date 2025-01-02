@@ -1,0 +1,23 @@
+{
+  "host": "myhost.com",
+  "port": "22",
+  "username": "root",
+  "filesystem": {
+    "host_path": "/srv/docker",
+    "container_mount_path": "/srv/docker"
+  },
+  "caddy": {
+    "email": "your-email@example.com"
+  },
+  "registry": {
+    "url": "registry.digitalocean.com",
+    "namespace": "your-namespace"
+  },
+  "services": {
+    "your-service-name": {
+      "env_vars": {
+        "MY_API_KEY": "your-env-var-value"
+      }
+    }
+  }
+}

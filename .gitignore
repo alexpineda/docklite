@@ -3,6 +3,8 @@
 docker-config.json
 *.env
 
+dashboard/config.json
+
 # Certificates and keys
 certs/
 *.pem
