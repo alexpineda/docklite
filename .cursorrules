@@ -1,29 +1,40 @@
-# Ansible API Deployment Setup
+This is a monorepo for my api services which includes a gui and ansible scripts for deploying services.
 
-## Architecture
-- Local Flask dashboard for monitoring
-- Remote Docker deployments on DigitalOcean
-- Caddy for reverse proxy and SSL
-- All services expose port 3000
+We use the DigitalOcean container registry for listing what is available.
+We use Docker Client to interact with the remote docker daemon, understanding what is running etc.
+We use Ansible to deploy to the remote host.
+We use Github Actions to build the images and push them to the registry.
+
+We use caddy on the host for reverse proxy and ssl.
+Each service gets a subdomain and a caddy config.
 
 ## Project Structure
 ```
-├── dashboard/           # Local monitoring dashboard (runs on Mac)
-│   └── deploy.py           # Ansible deployment script
-│   └── app.py
-├── vars/               # Ansible variables
-├── templates/          # Ansible templates
-│   └── caddy/         # Caddy reverse proxy configs
+dashboard/ - gui and scripts for deploying containers
+- app.py       - flask app
+- deploy.py    - python script to deploy containers
+- templates/   - html templates
+dashboard/ansible
+- deploy.yml     - deploy any containers in services.yml
+- playbook.yml   - deploy required services (docker, caddy, etc)
+- vars/          - ansible variables written by deploy.py
+- templates/     - caddy templates
+- caddy/         - caddy templates
 ```
 
 ## Deployment
-1. Images are deployed to DigitalOcean container registry
-- This may change to Github as we need Github actions to build the images
-- We list the images in 
-1. Services are deployed via:
-   deploy.py
+1. Services are developed under /services
+- They each have a Dockerfile
+- They get built with Github Actions and pushed to the registry
+1. Containers are deployed via:
+   - deploy.py directly OR
+   - Users on the web app can:
+     - Redeploy the entire server services (docker, caddy, etc)
+     - Redeploy all containers
+     - Redeploy a single container
+     - Deploy a new container based on a registry image
    we write to vars/services.yml and var/domain.yml so that the ansible playbook.yml and deploy.yml can use them
-2. Each service should:
+2. Each container should:
    - Expose port 3000
    - Be available as a Docker image
    - Support health checks
