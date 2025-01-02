@@ -1,12 +1,11 @@
 # Use Bun's official image (Debian variant)
-FROM --platform=linux/amd64 oven/bun:debian
+FROM oven/bun:debian
 
 # Set the working directory
 WORKDIR /app
 
 # Copy package files
 COPY package.json ./
-COPY bun.lockb ./
 
 # Copy source code
 COPY src ./src
