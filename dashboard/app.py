@@ -118,8 +118,8 @@ def list_registry_images():
                 print(f"Tags for {repo['name']}: {tags}")
                 
                 if tags:
-                    # Use latest tag or first available
-                    tag = next((t['tag'] for t in tags if t['tag'] == 'latest'), tags[0]['tag'])
+                    # Get the most recent tag (first in list from doctl)
+                    tag = tags[0]['tag']
                     # Properly construct image URL with namespace
                     image = f"{REGISTRY_URL}/{REGISTRY_NAMESPACE}/{repo['name']}:{tag}"
                     # Use repository name as service name
@@ -185,7 +185,7 @@ def dashboard():
                     service['deployed'] = True
                     
                     # Get the current container image tag
-                    container_tag = container.image.tags[0].split(':')[1] if container.image.tags else None
+                    container_tag = container.image.tags[0] if container.image.tags else None
                     
                     # Get latest image tag from registry using doctl
                     try:
@@ -194,9 +194,10 @@ def dashboard():
                             capture_output=True, text=True, check=True
                         )
                         registry_tags = tag_result.stdout.strip().split('\n')
-                        latest_tag = next((tag for tag in registry_tags if tag and tag != 'latest'), None)
+                        # Get the most recent tag (first in list)
+                        latest_tag = registry_tags[0] if registry_tags else None
                         
-                        service['image_mismatch'] = container_tag != latest_tag if container_tag and latest_tag else False
+                        service['image_mismatch'] = container_tag != f"{REGISTRY_URL}/{REGISTRY_NAMESPACE}/{service['name']}:{latest_tag}" if container_tag and latest_tag else False
                         print(f"Container tag: {container_tag}")
                         print(f"Latest tag: {latest_tag}")
                         print(f"Image mismatch for {service['name']}: {service['image_mismatch']}")
@@ -584,9 +585,12 @@ def stream_deploy_service():
                 
                 # Run deployment with build step
                 success = False
+                recap_found = False
                 for output in run_ansible_playbook('deploy.yml', f'@{temp_vars_file}'):
                     yield output
-                    if "PLAY RECAP" in output and "failed=0" in output and "unreachable=0" in output:
+                    if "PLAY RECAP" in output:
+                        recap_found = True
+                    if recap_found and "failed=0" in output and "unreachable=0" in output:
                         success = True
                 
                 if success:

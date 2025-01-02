@@ -1,4 +1,4 @@
 {{ item.domain }} {
-    reverse_proxy {{ item.name }}:3000
+    reverse_proxy localhost:3000
     tls {{ caddy_email }}
 }

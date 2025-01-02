@@ -5,8 +5,15 @@
   vars_files:
     - vars/services.yml
     - vars/domain.yml
+  vars:
+    docker_network: api_network
 
   tasks:
+    - name: Ensure Docker network exists
+      community.docker.docker_network:
+        name: "{{ docker_network }}"
+        state: present
+
     - name: Ensure host directories exist for each service
       file:
         path: "/srv/docker/{{ item.name }}"
@@ -20,10 +27,13 @@
         image: "{{ item.image }}"
         state: started
         restart_policy: unless-stopped
+        pull: true
+        force_kill: true
+        recreate: true
         networks:
           - name: "{{ docker_network }}"
-        exposed_ports:
-          - "3000"
+        published_ports:
+          - "127.0.0.1:3000:3000"
         volumes:
           - "/srv/docker/{{ item.name }}:/var/lib/app_data"
         platform: "linux/amd64"

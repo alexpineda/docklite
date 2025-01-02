@@ -62,7 +62,14 @@
                         </span>
                     </td>
                     <td>
-                        <div class="btn-group">
+                        <button class="btn btn-link btn-sm" type="button" onclick="toggleActions('{{ service.name }}')" aria-expanded="false">
+                            Actions <i class="bi bi-chevron-down"></i>
+                        </button>
+                    </td>
+                </tr>
+                <tr id="actions-{{ service.name }}" class="actions-row" style="display: none;">
+                    <td colspan="5">
+                        <div class="btn-group w-100 justify-content-start">
                             <form action="{{ url_for('restart_service', name=service.name) }}" method="POST" style="display: inline;">
                                 <button type="submit" class="btn btn-warning btn-sm" {% if not service.deployed %}disabled{% endif %}>Restart</button>
                             </form>
@@ -76,7 +83,6 @@
                             <button type="button" class="btn btn-primary btn-sm" onclick="showMetrics('{{ service.name }}')" data-bs-toggle="modal" data-bs-target="#metricsModal">
                                 Metrics
                             </button>
-
                             {% endif %}
                             <button type="button" class="btn btn-secondary btn-sm" onclick="showLogs('{{ service.name }}')" data-bs-toggle="modal" data-bs-target="#logsModal">
                                 Logs
@@ -341,6 +347,15 @@ function updateLogs() {
 
 function refreshLogs() {
     updateLogs();
+}
+
+function toggleActions(serviceName) {
+    const actionsRow = document.getElementById(`actions-${serviceName}`);
+    if (actionsRow.style.display === 'none') {
+        actionsRow.style.display = 'table-row';
+    } else {
+        actionsRow.style.display = 'none';
+    }
 }
 </script>
 
