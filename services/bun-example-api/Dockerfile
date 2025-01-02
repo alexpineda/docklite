@@ -1,17 +1,18 @@
-# Use Bun's official image
-FROM oven/bun:1
+# Use Bun's official image (Debian variant)
+FROM --platform=linux/amd64 oven/bun:debian
 
 # Set the working directory
 WORKDIR /app
 
-# Copy package.json and bun.lockb (if exists)
+# Copy package files
 COPY package.json ./
-
-# Install dependencies
-RUN bun install
+COPY bun.lockb ./
 
 # Copy source code
 COPY src ./src
+
+# Install dependencies
+RUN bun install
 
 # Expose the port your app listens on
 EXPOSE 3000

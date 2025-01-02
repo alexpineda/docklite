@@ -22,6 +22,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Install doctl
         uses: digitalocean/action-doctl@v2
         with:
@@ -30,13 +33,12 @@ jobs:
       - name: Log in to DO Container Registry
         run: doctl registry login --expiry-seconds 600
 
-      - name: Build image
-        working-directory: services/${{ matrix.service }}
-        run: |
-          docker build -t ${{ vars.REGISTRY }}/${{ matrix.service }}:${{ github.sha }} .
-          docker tag ${{ vars.REGISTRY }}/${{ matrix.service }}:${{ github.sha }} ${{ vars.REGISTRY }}/${{ matrix.service }}:latest
-
-      - name: Push image
-        run: |
-          docker push ${{ vars.REGISTRY }}/${{ matrix.service }}:${{ github.sha }}
-          docker push ${{ vars.REGISTRY }}/${{ matrix.service }}:latest 
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: services/${{ matrix.service }}
+          push: true
+          platforms: linux/amd64
+          tags: |
+            ${{ env.REGISTRY }}/${{ matrix.service }}:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ matrix.service }}:latest 

@@ -184,8 +184,25 @@ def dashboard():
                     service['logs'] = container.logs(tail=5).decode('utf-8').split('\n')
                     service['deployed'] = True
                     
-                    # Check if container image matches registry
-                    service['image_mismatch'] = container.image.tags[0] if container.image.tags else 'unknown' != service['image']
+                    # Get the current container image tag
+                    container_tag = container.image.tags[0].split(':')[1] if container.image.tags else None
+                    
+                    # Get latest image tag from registry using doctl
+                    try:
+                        tag_result = subprocess.run(
+                            ['doctl', 'registry', 'repository', 'list-tags', service['name'], '--format', 'Tag', '--no-header'],
+                            capture_output=True, text=True, check=True
+                        )
+                        registry_tags = tag_result.stdout.strip().split('\n')
+                        latest_tag = next((tag for tag in registry_tags if tag and tag != 'latest'), None)
+                        
+                        service['image_mismatch'] = container_tag != latest_tag if container_tag and latest_tag else False
+                        print(f"Container tag: {container_tag}")
+                        print(f"Latest tag: {latest_tag}")
+                        print(f"Image mismatch for {service['name']}: {service['image_mismatch']}")
+                    except Exception as e:
+                        print(f"Error getting latest tag for {service['name']}: {e}")
+                        service['image_mismatch'] = False
                 else:
                     service['status'] = 'not deployed'
                     service['running'] = False
@@ -203,9 +220,6 @@ def dashboard():
                         'running': container.status == 'running',
                         'logs': container.logs(tail=5).decode('utf-8').split('\n')
                     })
-            
-            # Update services.yml for Ansible
-            update_services_yaml(services)
                 
         except Exception as e:
             error_message = f"Error connecting to Docker: {e}"
@@ -217,25 +231,6 @@ def dashboard():
                          docker_available=docker_available,
                          error_message=error_message,
                          base_domain=os.getenv('BASE_DOMAIN', 'alexpineda.ca'))
-
-@app.route('/deploy', methods=['POST'])
-def deploy():
-    if not client:
-        flash('Docker is not available. Please check server setup.', 'error')
-        return redirect(url_for('dashboard'))
-
-    image = request.form.get('image')
-    domain = request.form.get('domain')
-    
-    if not image or not domain:
-        flash('Image and domain are required', 'error')
-        return redirect(url_for('dashboard'))
-    # Show deployment progress page
-    service_name = domain.split('.')[0]  # Extract subdomain as name
-    return render_template('deploy_progress.html',
-                         title='Deploying New Service',
-                         message=f'Deploying {image} to {domain}...',
-                         service_name=service_name)
 
 @app.route('/service/<name>/restart', methods=['POST'])
 def restart_service(name):
@@ -591,10 +586,8 @@ def stream_deploy_service():
                 success = False
                 for output in run_ansible_playbook('deploy.yml', f'@{temp_vars_file}'):
                     yield output
-                    if "PLAY RECAP" in output:
-                        # Check if there are any failures in the recap
-                        if "failed=0" in output and "unreachable=0" in output:
-                            success = True
+                    if "PLAY RECAP" in output and "failed=0" in output and "unreachable=0" in output:
+                        success = True
                 
                 if success:
                     yield "data: Service deployment completed successfully\n\n"

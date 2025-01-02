@@ -46,12 +46,14 @@
             <tbody>
                 {% for service in services %}
                 <tr class="{% if service.image_mismatch %}table-warning{% endif %}">
-                    <td>{{ service.name }}</td>
+                    <td>
+                        {{ service.name }}
+                        {% if service.image_mismatch %}
+                        <span class="badge bg-warning" data-bs-toggle="tooltip" data-bs-placement="right" title="Container is running an older version. Click 'Redeploy' to update.">!</span>
+                        {% endif %}
+                    </td>
                     <td>
                         <a href="https://{{ service.domain }}" target="_blank">{{ service.domain }}</a>
-                        {% if service.image_mismatch %}
-                        <span class="badge bg-warning" title="Container image differs from configuration">!</span>
-                        {% endif %}
                     </td>
                     <td>{{ service.image }}</td>
                     <td>
@@ -93,7 +95,7 @@
         </table>
     </div>
     {% else %}
-    <p>No services configured yet.</p>
+        <p>No services found.</p>
     {% endif %}
 
     {% if orphaned_containers %}
@@ -142,24 +144,6 @@
         </table>
     </div>
     {% endif %}
-
-    <div class="mt-4">
-        <h3>Add New Service</h3>
-        <form action="{{ url_for('deploy') }}" method="POST">
-            <div class="mb-3">
-                <label for="image" class="form-label" >Docker Image</label>
-                <input type="text" class="form-control" id="image" name="image" required placeholder="registry.digitalocean.com/api-alexpineda-containers/bun-example-api">
-            </div>
-            <div class="mb-3">
-                <label for="domain" class="form-label">Domain</label>
-                <div class="input-group">
-                    <input type="text" class="form-control" id="domain" name="domain" required placeholder="bun-example">
-                    <span class="input-group-text">.{{ base_domain }}</span>
-                </div>
-            </div>
-            <button type="submit" class="btn btn-primary" {% if not docker_available %}disabled{% endif %}>Deploy</button>
-        </form>
-    </div>
 </div>
 
 <!-- Metrics Modal -->
@@ -203,6 +187,14 @@
 </div>
 
 <script>
+// Initialize tooltips
+document.addEventListener('DOMContentLoaded', function() {
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl)
+    });
+});
+
 function deployService(name) {
     window.location.href = `/stream-deploy-service?name=${name}`;
 }
