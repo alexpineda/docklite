@@ -1,0 +1,46 @@
+---
+- name: Deploy API Services
+  hosts: api_server
+  become: yes
+  vars_files:
+    - vars/services.yml
+    - vars/domain.yml
+
+  tasks:
+    - name: Deploy API services
+      community.docker.docker_container:
+        name: "{{ item.name }}"
+        image: "{{ item.image }}"
+        state: started
+        restart_policy: unless-stopped
+        networks:
+          - name: "{{ docker_network }}"
+        exposed_ports:
+          - "3000"
+      loop: "{{ api_services }}"
+
+    - name: Configure Caddy for each service
+      template:
+        src: templates/caddy/api_block.j2
+        dest: /etc/caddy/conf.d/{{ item.name }}.conf
+      loop: "{{ api_services }}"
+      notify: reload caddy
+
+    - name: Configure main Caddy file
+      copy:
+        content: |
+          {
+              email {{ caddy_email }}
+          }
+
+          import /etc/caddy/conf.d/*
+
+          {{ caddy_reverse_proxies }}
+        dest: /etc/caddy/Caddyfile
+      notify: reload caddy
+
+  handlers:
+    - name: reload caddy
+      systemd:
+        name: caddy
+        state: reloaded 

@@ -1,5 +1,12 @@
-# Use the official Bun base image
-FROM oven/bun:latest
+# Use Node.js base image
+FROM node:18-slim
+
+# Install bun
+RUN apt-get update && apt-get install -y curl unzip \
+    && curl -fsSL https://bun.sh/install | bash
+
+# Add bun to PATH
+ENV PATH="/root/.bun/bin:${PATH}"
 
 # Set the working directory
 WORKDIR /app

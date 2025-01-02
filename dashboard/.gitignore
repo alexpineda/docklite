@@ -1,0 +1,6 @@
+services.db
+services.db-journal
+__pycache__/
+*.pyc
+certs/
+*.pem 

@@ -1,139 +1,137 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>API Services Dashboard</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-gray-100">
-    <div class="container mx-auto px-4 py-8">
-        <div class="flex justify-between items-center mb-8">
-            <h1 class="text-3xl font-bold">API Services Dashboard</h1>
-            <div class="space-x-4">
-                <form action="{{ url_for('redeploy_all') }}" method="POST" class="inline">
-                    <button type="submit" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded">
-                        Redeploy All
-                    </button>
-                </form>
-                <button onclick="showDeployModal()" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded">
-                    Deploy New Service
-                </button>
-            </div>
-        </div>
+{% extends "base.html" %}
+{% block content %}
 
-        <!-- Error Message -->
-        {% if error_message %}
-            <div class="mb-8 p-4 rounded-lg bg-red-100 text-red-700">
-                {{ error_message }}
-            </div>
-        {% endif %}
+{% if error_message %}
+<div class="alert alert-danger">{{ error_message }}</div>
+{% endif %}
 
-        <!-- Flash Messages -->
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                    <div class="mb-4 p-4 rounded-lg {% if category == 'error' %}bg-red-100 text-red-700{% else %}bg-green-100 text-green-700{% endif %}">
-                        {{ message }}
-                    </div>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
-
-        <!-- Deploy New Service Form -->
-        <div class="bg-white rounded-lg shadow-md p-6 mb-8 {% if not docker_available %}opacity-50 pointer-events-none{% endif %}">
-            <h2 class="text-xl font-semibold mb-4">Deploy New Service</h2>
-            <form action="{{ url_for('deploy') }}" method="POST" class="space-y-4">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">Docker Image</label>
-                    <input type="text" name="image" placeholder="nginx:latest" 
-                           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">Domain</label>
-                    <div class="flex items-center">
-                        <input type="text" name="domain" placeholder="api" 
-                               class="mt-1 block w-full rounded-l-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                        <span class="mt-1 px-3 py-2 bg-gray-50 text-gray-500 border border-l-0 border-gray-300 rounded-r-md">
-                            .{{ base_domain }}
+<div class="container mt-4">
+    <h2>API Services</h2>
+    
+    {% if services %}
+    <div class="table-responsive">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Domain</th>
+                    <th>Image</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for service in services %}
+                <tr class="{% if service.image_mismatch %}table-warning{% endif %}">
+                    <td>{{ service.name }}</td>
+                    <td>
+                        <a href="https://{{ service.domain }}" target="_blank">{{ service.domain }}</a>
+                        {% if service.image_mismatch %}
+                        <span class="badge bg-warning" title="Container image differs from configuration">!</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ service.image }}</td>
+                    <td>
+                        <span class="badge {% if service.running %}bg-success{% else %}bg-danger{% endif %}">
+                            {{ service.status }}
                         </span>
-                    </div>
-                </div>
-                <button type="submit" 
-                        class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-                        {% if not docker_available %}disabled{% endif %}>
-                    Deploy Service
-                </button>
-            </form>
-        </div>
-        
-        <!-- Services Grid -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {% for service in services %}
-            <div class="bg-white rounded-lg shadow-md p-6">
-                <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-xl font-semibold">{{ service.name }}</h2>
-                    <span class="px-3 py-1 rounded-full text-sm 
-                        {% if service.running %}
-                            bg-green-100 text-green-800
-                        {% else %}
-                            bg-red-100 text-red-800
-                        {% endif %}">
-                        {{ service.status }}
-                    </span>
-                </div>
-                
-                <div class="space-y-2">
-                    <p class="text-gray-600">
-                        <span class="font-medium">Image:</span> 
-                        {{ service.image }}
-                    </p>
-                    <p class="text-gray-600">
-                        <span class="font-medium">Domain:</span> 
-                        <a href="https://{{ service.domain }}" target="_blank" class="text-blue-600 hover:underline">
-                            {{ service.domain }}
-                        </a>
-                    </p>
-                </div>
-
+                    </td>
+                    <td>
+                        <div class="btn-group">
+                            <form action="{{ url_for('restart_service', name=service.name) }}" method="POST" style="display: inline;">
+                                <button type="submit" class="btn btn-warning btn-sm" {% if not service.deployed %}disabled{% endif %}>Restart</button>
+                            </form>
+                            <form action="{{ url_for('shutdown_service', name=service.name) }}" method="POST" style="display: inline;">
+                                <button type="submit" class="btn btn-danger btn-sm" {% if not service.deployed %}disabled{% endif %}>Shutdown</button>
+                            </form>
+                            <button type="button" class="btn btn-info btn-sm" onclick="deployService('{{ service.name }}')" {% if not docker_available %}disabled{% endif %}>
+                                {% if service.deployed %}Redeploy{% else %}Deploy{% endif %}
+                            </button>
+                        </div>
+                    </td>
+                </tr>
                 {% if service.logs %}
-                <div class="mt-4">
-                    <h3 class="text-sm font-medium text-gray-700 mb-2">Recent Logs:</h3>
-                    <div class="bg-gray-50 rounded p-3 text-sm font-mono">
-                        {% for log in service.logs %}
-                            {% if log %}
-                                <div class="truncate">{{ log }}</div>
-                            {% endif %}
-                        {% endfor %}
-                    </div>
-                </div>
+                <tr>
+                    <td colspan="5">
+                        <pre class="logs">{{ service.logs|join('\n') }}</pre>
+                    </td>
+                </tr>
                 {% endif %}
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p>No services configured yet.</p>
+    {% endif %}
 
-                <!-- Service Actions -->
-                <div class="mt-4 flex space-x-2">
-                    <form action="{{ url_for('restart_service', name=service.name) }}" method="POST">
-                        <button type="submit" 
-                                class="bg-yellow-500 text-white px-3 py-1 rounded hover:bg-yellow-600 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-2"
-                                {% if not docker_available %}disabled{% endif %}>
-                            Restart
-                        </button>
-                    </form>
+    {% if orphaned_containers %}
+    <h3 class="mt-4">Orphaned Containers</h3>
+    <div class="alert alert-warning">
+        These containers are running but have no corresponding service configuration.
+    </div>
+    <div class="table-responsive">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Image</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for container in orphaned_containers %}
+                <tr>
+                    <td>{{ container.name }}</td>
+                    <td>{{ container.image }}</td>
+                    <td>
+                        <span class="badge {% if container.running %}bg-success{% else %}bg-danger{% endif %}">
+                            {{ container.status }}
+                        </span>
+                    </td>
+                    <td>
+                        <form action="{{ url_for('shutdown_service', name=container.name) }}" method="POST" style="display: inline;">
+                            <button type="submit" class="btn btn-danger btn-sm">Remove</button>
+                        </form>
+                    </td>
+                </tr>
+                {% if container.logs %}
+                <tr>
+                    <td colspan="4">
+                        <pre class="logs">{{ container.logs|join('\n') }}</pre>
+                    </td>
+                </tr>
+                {% endif %}
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+
+    <div class="mt-4">
+        <h3>Add New Service</h3>
+        <form action="{{ url_for('deploy') }}" method="POST">
+            <div class="mb-3">
+                <label for="image" class="form-label">Docker Image</label>
+                <input type="text" class="form-control" id="image" name="image" required>
+            </div>
+            <div class="mb-3">
+                <label for="domain" class="form-label">Domain</label>
+                <div class="input-group">
+                    <input type="text" class="form-control" id="domain" name="domain" required>
+                    <span class="input-group-text">.{{ base_domain }}</span>
                 </div>
             </div>
-            {% endfor %}
-        </div>
+            <button type="submit" class="btn btn-primary" {% if not docker_available %}disabled{% endif %}>Deploy</button>
+        </form>
     </div>
+</div>
 
-    <script>
-        // Refresh the page every 30 seconds
-        setTimeout(() => window.location.reload(), 30000);
+<script>
+function deployService(name) {
+    window.location.href = `/stream-deploy-service?name=${name}`;
+}
+</script>
 
-        // Auto-append base domain
-        document.querySelector('input[name="domain"]').addEventListener('change', function(e) {
-            if (e.target.value.includes('.')) {
-                e.target.value = e.target.value.split('.')[0];
-            }
-        });
-    </script>
-</body>
-</html> 
+{% endblock %} 
