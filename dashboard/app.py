@@ -18,7 +18,7 @@ app.secret_key = os.urandom(24)  # For flash messages
 DOCKER_HOST = os.getenv('DOCKER_HOST', f"tcp://{os.getenv('DROPLET_IP', 'localhost')}:2376")
 
 # Get absolute path to certs directory
-CERTS_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'certs'))
+CERTS_DIR = os.path.abspath(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'certs'))
 DOCKER_CERT_PATH = os.getenv('DOCKER_CERT_PATH', CERTS_DIR)
 DOCKER_TLS_VERIFY = os.getenv('DOCKER_TLS_VERIFY', '1')
 
