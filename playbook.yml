@@ -1,0 +1,261 @@
+---
+- name: Deploy API Services
+  hosts: api_server
+  become: yes
+  vars_files:
+    - vars/services.yml
+    - vars/domain.yml
+
+  tasks:
+    - name: Install required packages
+      apt:
+        name:
+          - ca-certificates
+          - curl
+        state: present
+        update_cache: yes
+
+    - name: Remove conflicting packages
+      apt:
+        name:
+          - docker.io
+          - docker-doc
+          - docker-compose
+          - docker-compose-v2
+          - podman-docker
+          - containerd
+          - runc
+        state: absent
+        purge: yes
+
+    - name: Create keyrings directory
+      file:
+        path: /etc/apt/keyrings
+        state: directory
+        mode: '0755'
+
+    - name: Download Docker GPG key
+      get_url:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        dest: /etc/apt/keyrings/docker.asc
+        mode: '0644'
+
+    - name: Add Docker repository
+      shell: |
+        echo "deb [arch={{ ansible_architecture }} signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+    - name: Install Docker packages
+      apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-buildx-plugin
+          - docker-compose-plugin
+        state: present
+        update_cache: yes
+
+    - name: Create Docker daemon directory
+      file:
+        path: /etc/docker
+        state: directory
+        mode: '0755'
+
+    - name: Create Docker certs directory
+      file:
+        path: /etc/docker/certs
+        state: directory
+        mode: '0755'
+
+    - name: Copy TLS certificates to server
+      copy:
+        src: "{{ item.src }}"
+        dest: "{{ item.dest }}"
+        mode: '0644'
+      loop:
+        - { src: 'certs/ca.pem', dest: '/etc/docker/certs/ca.pem' }
+        - { src: 'certs/server-cert.pem', dest: '/etc/docker/certs/server-cert.pem' }
+        - { src: 'certs/server-key.pem', dest: '/etc/docker/certs/server-key.pem' }
+
+    - name: Configure Docker daemon with TLS
+      copy:
+        content: |
+          {
+            "tls": true,
+            "tlscacert": "/etc/docker/certs/ca.pem",
+            "tlscert": "/etc/docker/certs/server-cert.pem",
+            "tlskey": "/etc/docker/certs/server-key.pem",
+            "tlsverify": true,
+            "hosts": ["unix:///var/run/docker.sock", "tcp://0.0.0.0:2376"]
+          }
+        dest: /etc/docker/daemon.json
+
+    - name: Create Docker systemd override directory
+      file:
+        path: /etc/systemd/system/docker.service.d
+        state: directory
+        mode: '0755'
+
+    - name: Configure Docker service override
+      copy:
+        content: |
+          [Unit]
+          After=network-online.target firewalld.service containerd.service time-set.target
+          Wants=network-online.target containerd.service
+          Requires=
+
+          [Service]
+          ExecStart=
+          ExecStart=/usr/bin/dockerd --containerd=/run/containerd/containerd.sock
+        dest: /etc/systemd/system/docker.service.d/override.conf
+      notify: 
+        - daemon-reload
+        - restart docker
+
+    - name: Reload systemd daemon
+      systemd:
+        daemon_reload: yes
+
+    - name: Ensure Docker service is running
+      service:
+        name: docker
+        state: restarted
+        enabled: yes
+
+    - name: Install UFW
+      apt:
+        name: ufw
+        state: present
+
+    - name: Allow SSH first (before enabling UFW)
+      ufw:
+        rule: allow
+        port: '22'
+        proto: tcp
+
+    - name: Allow Docker TLS port
+      ufw:
+        rule: allow
+        port: '2376'
+        proto: tcp
+
+    - name: Allow HTTP
+      ufw:
+        rule: allow
+        port: '80'
+        proto: tcp
+
+    - name: Allow HTTPS
+      ufw:
+        rule: allow
+        port: '443'
+        proto: tcp
+
+    - name: Enable UFW and deny other ports
+      ufw:
+        state: enabled
+        policy: deny
+      async: 10
+      poll: 2
+
+    - name: Install Docker SDK for Python
+      apt:
+        name: python3-docker
+        state: present
+        update_cache: yes
+
+    - name: Download Caddy GPG key
+      get_url:
+        url: https://dl.cloudsmith.io/public/caddy/stable/gpg.key
+        dest: /usr/share/keyrings/caddy-stable-archive-keyring.asc
+        mode: '0644'
+
+    - name: Import Caddy GPG key
+      shell: cat /usr/share/keyrings/caddy-stable-archive-keyring.asc | gpg --dearmor > /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+
+    - name: Add Caddy repository
+      apt_repository:
+        repo: deb [signed-by=/usr/share/keyrings/caddy-stable-archive-keyring.gpg] https://dl.cloudsmith.io/public/caddy/stable/deb/debian any-version main
+        state: present
+        filename: caddy-stable
+
+    - name: Install Caddy
+      apt:
+        name: caddy
+        state: present
+        update_cache: yes
+
+    - name: Create Docker network
+      community.docker.docker_network:
+        name: "{{ docker_network }}"
+        state: present
+
+    - name: Ensure Caddy directories exist
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+      loop:
+        - /etc/caddy/conf.d
+        - /var/lib/caddy
+        - /var/log/caddy
+
+    - name: Create Docker config directory
+      file:
+        path: /root/.docker
+        state: directory
+        mode: '0700'
+
+    - name: Copy Docker config file
+      copy:
+        src: "{{ docker_config_file }}"
+        dest: /root/.docker/config.json
+        mode: '0600'
+      when: docker_config_file is defined
+
+    - name: Deploy API services
+      community.docker.docker_container:
+        name: "{{ item.name }}"
+        image: "{{ item.image }}"
+        state: started
+        restart_policy: unless-stopped
+        networks:
+          - name: "{{ docker_network }}"
+        exposed_ports:
+          - "3000"
+      loop: "{{ api_services }}"
+
+    - name: Configure Caddy for each service
+      template:
+        src: templates/caddy/api_block.j2
+        dest: /etc/caddy/conf.d/{{ item.name }}.conf
+      loop: "{{ api_services }}"
+      notify: reload caddy
+
+    - name: Configure main Caddy file
+      copy:
+        content: |
+          {
+              email {{ caddy_email }}
+          }
+
+          import /etc/caddy/conf.d/*
+
+          {{ caddy_reverse_proxies }}
+        dest: /etc/caddy/Caddyfile
+      notify: reload caddy
+
+  handlers:
+    - name: reload caddy
+      systemd:
+        name: caddy
+        state: reloaded
+
+    - name: restart docker
+      systemd:
+        name: docker
+        state: restarted
+
+    - name: daemon-reload
+      systemd:
+        daemon_reload: yes

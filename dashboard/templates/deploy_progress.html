@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Deployment Progress</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100">
+    <div class="container mx-auto px-4 py-8">
+        <div class="flex justify-between items-center mb-8">
+            <h1 class="text-3xl font-bold">Deployment Progress</h1>
+            <a href="{{ url_for('dashboard') }}" class="text-blue-500 hover:text-blue-600">Back to Dashboard</a>
+        </div>
+
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <div id="status" class="text-lg font-semibold mb-4">
+                Deployment in progress...
+            </div>
+
+            <div id="output" class="bg-gray-50 rounded p-4 font-mono text-sm h-[600px] overflow-y-auto whitespace-pre-wrap"></div>
+        </div>
+    </div>
+
+    <script>
+        const output = document.getElementById('output');
+        const status = document.getElementById('status');
+        let completed = false;
+
+        const eventSource = new EventSource("{{ url_for('stream_deploy') }}");
+        
+        eventSource.onmessage = function(event) {
+            const line = event.data;
+            
+            // Append the new line
+            output.textContent += line + '\n';
+            
+            // Auto-scroll to bottom
+            output.scrollTop = output.scrollHeight;
+
+            // Update status for completion messages
+            if (line.includes('Deployment completed successfully')) {
+                status.textContent = 'Deployment completed successfully!';
+                status.className = 'text-lg font-semibold mb-4 text-green-600';
+                completed = true;
+                eventSource.close();
+            } else if (line.includes('Deployment failed') || line.includes('Error:')) {
+                status.textContent = 'Deployment failed';
+                status.className = 'text-lg font-semibold mb-4 text-red-600';
+                completed = true;
+                eventSource.close();
+            }
+        };
+
+        eventSource.onerror = function(event) {
+            if (!completed) {
+                status.textContent = 'Connection lost';
+                status.className = 'text-lg font-semibold mb-4 text-red-600';
+                output.textContent += '\nConnection to server lost.\n';
+            }
+            eventSource.close();
+        };
+
+        // Add warning if user tries to leave
+        window.onbeforeunload = function() {
+            if (!completed) {
+                return "Deployment is still in progress. Are you sure you want to leave?";
+            }
+        };
+    </script>
+</body>
+</html> 

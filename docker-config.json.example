@@ -1,0 +1,7 @@
+{
+  "auths": {
+    "registry.digitalocean.com": {
+      "auth": "your_base64_encoded_credentials"
+    }
+  }
+} 

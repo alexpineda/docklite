@@ -1,0 +1,39 @@
+# Ansible API Deployment Setup
+
+## Architecture
+- Local Flask dashboard for monitoring
+- Remote Docker deployments on DigitalOcean
+- Caddy for reverse proxy and SSL
+- All services expose port 3000
+
+## Project Structure
+```
+├── dashboard/           # Local monitoring dashboard (runs on Mac)
+├── vars/               # Ansible variables
+├── templates/          # Ansible templates
+│   └── caddy/         # Caddy reverse proxy configs
+└── deploy-api.sh      # Main deployment script
+```
+
+## Deployment
+1. Services are deployed via:
+   ```bash
+   ./deploy-api.sh <docker-image> <domain>
+   ```
+2. Each service should:
+   - Expose port 3000
+   - Be available as a Docker image
+   - Support health checks
+
+## Dashboard
+- Runs locally on Mac
+- Connects to remote Docker daemon
+- Requires TLS certificates in ~/.docker/machine/certs/
+- Access at http://localhost:3000
+
+## Configuration
+- Services are tracked in vars/services.yml
+- Each service needs:
+  - name: derived from domain
+  - image: Docker image
+  - domain: service domain 
