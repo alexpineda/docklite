@@ -26,6 +26,32 @@
                     <strong>Deploy All Services:</strong> Only redeploys API services without modifying infrastructure.
                 </small>
             </div>
+            
+            <div class="mt-4">
+                <button class="btn btn-link p-0" type="button" data-bs-toggle="collapse" data-bs-target="#caddyConfig" aria-expanded="false" aria-controls="caddyConfig">
+                    Show Caddy Configuration <i class="bi bi-chevron-down"></i>
+                </button>
+                <div class="collapse mt-2" id="caddyConfig">
+                    <div class="card card-body bg-light">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h6 class="mb-0">Caddy Configuration</h6>
+                            <div class="btn-group">
+                                <button class="btn btn-sm btn-outline-secondary" onclick="refreshCaddyConfig()">
+                                    <i class="bi bi-arrow-clockwise"></i> Refresh
+                                </button>
+                                <button class="btn btn-sm btn-outline-danger" onclick="cleanupCaddyConfig()">
+                                    <i class="bi bi-trash"></i> Cleanup Stale Configs
+                                </button>
+                            </div>
+                        </div>
+                        <div id="staleCaddyWarning" class="alert alert-warning d-none mb-2">
+                            <i class="bi bi-exclamation-triangle"></i> Stale configurations detected. These files contain configurations for domains that are no longer active:
+                            <ul class="mb-0 mt-1" id="staleDomainsList"></ul>
+                        </div>
+                        <pre class="mb-0"><code id="actualCaddyConfig">Loading...</code></pre>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -96,7 +122,7 @@
                 {% if service.logs %}
                 <tr>
                     <td colspan="5">
-                        <pre class="logs">{{ service.logs|join('\n') }}</pre>
+                        <pre class="logs" style="cursor: pointer;" onclick="showLogs('{{ service.name }}')" data-bs-toggle="modal" data-bs-target="#logsModal">{{ service.logs|join('\n') }}</pre>
                     </td>
                 </tr>
                 {% endif %}
@@ -155,7 +181,7 @@
                 {% if container.logs %}
                 <tr>
                     <td colspan="4">
-                        <pre class="logs">{{ container.logs|join('\n') }}</pre>
+                        <pre class="logs" style="cursor: pointer;" onclick="showLogs('{{ container.name }}')" data-bs-toggle="modal" data-bs-target="#logsModal">{{ container.logs|join('\n') }}</pre>
                     </td>
                 </tr>
                 {% endif %}
@@ -261,13 +287,19 @@ function deployAllServices() {
 
 let metricsInterval;
 let currentContainer;
+let metricsModal;
 
 function showMetrics(containerName) {
     console.log('showMetrics called for container:', containerName);
     
+    // Clear any existing modal instance
+    if (metricsModal) {
+        metricsModal.dispose();
+    }
+    
     // Create a Bootstrap modal instance
     const modalElement = document.getElementById('metricsModal');
-    const modal = new bootstrap.Modal(modalElement);
+    metricsModal = new bootstrap.Modal(modalElement);
     
     // Clear any existing interval
     if (metricsInterval) {
@@ -277,7 +309,7 @@ function showMetrics(containerName) {
     currentContainer = containerName;
     
     // Show the modal
-    modal.show();
+    metricsModal.show();
     
     // Update metrics immediately
     updateMetrics();
@@ -357,6 +389,62 @@ function toggleActions(serviceName) {
         actionsRow.style.display = 'none';
     }
 }
+
+function refreshCaddyConfig() {
+    const configElement = document.getElementById('actualCaddyConfig');
+    const warningElement = document.getElementById('staleCaddyWarning');
+    const staleListElement = document.getElementById('staleDomainsList');
+    configElement.textContent = 'Loading...';
+    warningElement.classList.add('d-none');
+    
+    fetch('/caddy-config')
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                configElement.textContent = `Error: ${data.error}`;
+            } else {
+                configElement.textContent = data.config;
+                
+                // Show warning if stale files exist
+                if (data.stale_files && Object.keys(data.stale_files).length > 0) {
+                    staleListElement.innerHTML = Object.entries(data.stale_files)
+                        .map(([file, domains]) => `<li><code>${file}</code> (domains: ${domains.join(', ')})</li>`)
+                        .join('');
+                    warningElement.classList.remove('d-none');
+                }
+            }
+        })
+        .catch(error => {
+            configElement.textContent = `Error fetching configuration: ${error}`;
+        });
+}
+
+function cleanupCaddyConfig() {
+    if (!confirm('This will move stale configuration files to a backup directory. Proceed?')) {
+        return;
+    }
+    
+    fetch('/cleanup-caddy-config', {
+        method: 'POST'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            alert(`Error: ${data.error}`);
+        } else {
+            alert(data.message);
+            refreshCaddyConfig(); // Refresh to show updated conf.d contents
+        }
+    })
+    .catch(error => {
+        alert(`Error cleaning up Caddy config: ${error}`);
+    });
+}
+
+// Load Caddy config when section is expanded
+document.getElementById('caddyConfig').addEventListener('shown.bs.collapse', function () {
+    refreshCaddyConfig();
+});
 </script>
 
 {% endblock %} 

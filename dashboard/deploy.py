@@ -58,7 +58,8 @@ def run_ansible(env, full_redeploy=False):
     os.chdir(ansible_dir)
     
     # Create inventory file
-    with open('inventory.yml', 'w') as f:
+    inventory_path = os.path.join(ansible_dir, 'inventory.yml')
+    with open(inventory_path, 'w') as f:
         f.write(f"""all:
   hosts:
     api_server:
@@ -72,12 +73,13 @@ def run_ansible(env, full_redeploy=False):
     try:
         # Run playbook
         playbook = 'playbook.yml' if full_redeploy else 'deploy.yml'
-        subprocess.run(['ansible-playbook', '-i', 'inventory.yml', playbook], check=True)
+        playbook_path = os.path.join(ansible_dir, playbook)
+        subprocess.run(['ansible-playbook', '-i', inventory_path, playbook_path], check=True)
         return True
     finally:
         # Clean up inventory file
-        if os.path.exists('inventory.yml'):
-            os.remove('inventory.yml')
+        if os.path.exists(inventory_path):
+            os.remove(inventory_path)
 
 def check_container_status(env, container_name):
     """Check Docker container status and logs"""
