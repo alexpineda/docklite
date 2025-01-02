@@ -9,28 +9,39 @@
 ## Project Structure
 ```
 ├── dashboard/           # Local monitoring dashboard (runs on Mac)
-├── vars/               # Ansible variables
-├── templates/          # Ansible templates
-│   └── caddy/         # Caddy reverse proxy configs
-└── deploy-api.sh      # Main deployment script
+│   ├── app.py         # Flask web interface
+│   ├── deploy.py      # Deployment script
+│   ├── ansible/       # Ansible playbooks and configs
+│   │   ├── vars/     # Ansible variables
+│   │   └── templates/ # Ansible templates
+│   └── templates/     # Flask templates
 ```
 
 ## Deployment
-1. Services are deployed via:
+There are two ways to deploy services:
+
+1. Using deploy.py directly:
    ```bash
-   ./deploy-api.sh <docker-image> [--full-redeploy]
-   ```
-   Example:
-   ```bash
-   ./deploy-api.sh registry.digitalocean.com/api-alexpineda-containers/my-api:latest
+   cd dashboard
+   python deploy.py
    ```
 
-2. Each service should:
+2. Using the web dashboard:
+   ```bash
+   cd dashboard
+   uv run app.py
+   ```
+   Then visit http://localhost:3000 to:
+   - Deploy new containers from the registry
+   - Redeploy existing containers
+   - Manage the entire server setup
+
+Each service should:
    - Expose port 3000
    - Be available in the Docker registry
    - Support health checks
 
-3. Service names and domains are automatically derived from the image name:
+Service names and domains are derived from the image name:
    - Image: `registry.digitalocean.com/api-alexpineda-containers/my-api:latest`
    - Service name: `my-api`
    - Domain: `my-api.{BASE_DOMAIN}`
