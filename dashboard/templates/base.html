@@ -25,9 +25,6 @@
         <div class="container">
             <a class="navbar-brand" href="/">API Dashboard</a>
             <div class="d-flex">
-                <form action="{{ url_for('migrate') }}" method="POST" class="me-2">
-                    <button type="submit" class="btn btn-outline-light btn-sm">Migrate from YAML</button>
-                </form>
                 <form action="{{ url_for('redeploy_all') }}" method="POST">
                     <button type="submit" class="btn btn-outline-light btn-sm">Redeploy All</button>
                 </form>

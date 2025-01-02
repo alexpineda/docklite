@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, Response, stream_with_context
+from flask import Flask, render_template, request, redirect, url_for, flash, Response, stream_with_context, jsonify
 import docker
 import yaml
 import os
@@ -217,16 +217,6 @@ def dashboard():
                          docker_available=docker_available,
                          error_message=error_message,
                          base_domain=os.getenv('BASE_DOMAIN', 'alexpineda.ca'))
-
-# Add migration endpoint for initial setup
-@app.route('/migrate', methods=['POST'])
-def migrate():
-    try:
-        migrate_from_yaml()
-        flash('Successfully migrated services from YAML to database', 'success')
-    except Exception as e:
-        flash(f'Error during migration: {str(e)}', 'error')
-    return redirect(url_for('dashboard'))
 
 @app.route('/deploy', methods=['POST'])
 def deploy():
@@ -601,8 +591,10 @@ def stream_deploy_service():
                 success = False
                 for output in run_ansible_playbook('deploy.yml', f'@{temp_vars_file}'):
                     yield output
-                    if "Deployment completed successfully" in output:
-                        success = True
+                    if "PLAY RECAP" in output:
+                        # Check if there are any failures in the recap
+                        if "failed=0" in output and "unreachable=0" in output:
+                            success = True
                 
                 if success:
                     yield "data: Service deployment completed successfully\n\n"
@@ -716,6 +708,48 @@ def stream_deploy_services():
         stream_with_context(generate()),
         mimetype='text/event-stream'
     )
+
+@app.route('/container-stats/<name>')
+def container_stats(name):
+    if not client:
+        return jsonify({'error': 'Docker not available'}), 500
+        
+    try:
+        container = client.containers.get(name)
+        if container.status != 'running':
+            return jsonify({'error': 'Container not running'}), 400
+            
+        # Get container stats
+        stats = container.stats(stream=False)
+        
+        # Calculate CPU percentage
+        cpu_delta = stats['cpu_stats']['cpu_usage']['total_usage'] - stats['precpu_stats']['cpu_usage']['total_usage']
+        system_delta = stats['cpu_stats']['system_cpu_usage'] - stats['precpu_stats']['system_cpu_usage']
+        cpu_percent = 0.0
+        if system_delta > 0:
+            cpu_percent = (cpu_delta / system_delta) * len(stats['cpu_stats']['cpu_usage']['percpu_usage']) * 100.0
+            
+        # Calculate memory usage
+        mem_usage = stats['memory_stats']['usage']
+        mem_limit = stats['memory_stats']['limit']
+        mem_percent = (mem_usage / mem_limit) * 100.0
+        
+        # Get uptime
+        inspect = container.attrs
+        started_at = datetime.fromisoformat(inspect['State']['StartedAt'].replace('Z', '+00:00'))
+        uptime = datetime.now(started_at.tzinfo) - started_at
+        
+        return jsonify({
+            'cpu_percent': round(cpu_percent, 2),
+            'memory_usage': round(mem_usage / (1024 * 1024), 2),  # Convert to MB
+            'memory_limit': round(mem_limit / (1024 * 1024), 2),  # Convert to MB
+            'memory_percent': round(mem_percent, 2),
+            'uptime_seconds': uptime.total_seconds(),
+            'uptime_human': str(uptime).split('.')[0],  # Format as HH:MM:SS
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     print(f"Connecting to Docker at {DOCKER_HOST}")
