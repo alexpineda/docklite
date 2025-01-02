@@ -26,6 +26,7 @@
           - "3000"
         volumes:
           - "/srv/docker/{{ item.name }}:/var/lib/app_data"
+        platform: "linux/amd64"
       loop: "{{ api_services }}"
 
     - name: Configure Caddy for each service

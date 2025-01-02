@@ -40,3 +40,9 @@
   - name: derived from domain eg. bun-example-api
   - image: Docker image eg. registry.digitalocean.com/api-alexpineda-containers/bun-example-api:latest
   - domain: service domain eg. bun-example-api.api.alexpineda.ca
+
+
+When asking about the remote host and debugging stuff, use sshpass and HOST_SSH_USER and HOST_SSH_PASSWORD
+
+example command:
+source .env && export SSHPASS=$HOST_SSH_PASSWORD && sshpass -e ssh -o StrictHostKeyChecking=no $HOST_SSH_USER@$DROPLET_IP "docker ps"

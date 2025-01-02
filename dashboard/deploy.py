@@ -30,6 +30,12 @@ def get_subdomain_from_image(image):
     name = parts[-1].split(':')[0]
     return name
 
+def ensure_latest_tag(image):
+    """Ensure image has :latest tag if no tag specified"""
+    if ':' not in image:
+        return f"{image}:latest"
+    return image
+
 def update_domain_yaml(env):
     """Update domain.yml with current configuration"""
     parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -66,8 +72,8 @@ def run_ansible(env, full_redeploy=False):
     try:
         # Run playbook
         playbook = 'playbook.yml' if full_redeploy else 'deploy.yml'
-        result = subprocess.run(['ansible-playbook', '-i', 'inventory.yml', playbook], check=True)
-        return result.returncode == 0
+        subprocess.run(['ansible-playbook', '-i', 'inventory.yml', playbook], check=True)
+        return True
     finally:
         # Clean up inventory file
         if os.path.exists('inventory.yml'):
@@ -103,7 +109,7 @@ def main():
         print("Example: ./deploy.py registry.digitalocean.com/api-alexpineda-containers/my-api:latest --full-redeploy")
         sys.exit(1)
     
-    image = sys.argv[1]
+    image = ensure_latest_tag(sys.argv[1])
     full_redeploy = '--full-redeploy' in sys.argv
     env = load_env()
     container_name = get_subdomain_from_image(image)

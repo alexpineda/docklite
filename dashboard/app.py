@@ -255,9 +255,9 @@ def shutdown_service(name):
     try:
         container = client.containers.get(name)
         container.stop()
-        flash(f'Service {name} shut down successfully', 'success')
+        flash(f'Container {name} shut down successfully', 'success')
     except Exception as e:
-        flash(f'Error shutting down service: {str(e)}', 'error')
+        flash(f'Error shutting down container: {str(e)}', 'error')
     return redirect(url_for('dashboard'))
 
 @app.route('/service/<name>/delete', methods=['POST'])
@@ -273,9 +273,9 @@ def delete_service(name):
             container.stop()
         # Remove the container
         container.remove()
-        flash(f'Service {name} deleted successfully', 'success')
+        flash(f'Container {name} deleted successfully', 'success')
     except Exception as e:
-        flash(f'Error deleting service: {str(e)}', 'error')
+        flash(f'Error deleting container: {str(e)}', 'error')
     return redirect(url_for('dashboard'))
 
 def stream_ansible():
@@ -715,12 +715,20 @@ def container_stats(name):
         # Get container stats
         stats = container.stats(stream=False)
         
-        # Calculate CPU percentage
+        # Calculate CPU percentage more robustly
         cpu_delta = stats['cpu_stats']['cpu_usage']['total_usage'] - stats['precpu_stats']['cpu_usage']['total_usage']
         system_delta = stats['cpu_stats']['system_cpu_usage'] - stats['precpu_stats']['system_cpu_usage']
+        
+        # Get number of CPUs - fallback to 1 if percpu_usage is not available
+        num_cpus = 1
+        if 'percpu_usage' in stats['cpu_stats']['cpu_usage']:
+            num_cpus = len(stats['cpu_stats']['cpu_usage']['percpu_usage'])
+        elif 'online_cpus' in stats['cpu_stats']:
+            num_cpus = stats['cpu_stats']['online_cpus']
+            
         cpu_percent = 0.0
         if system_delta > 0:
-            cpu_percent = (cpu_delta / system_delta) * len(stats['cpu_stats']['cpu_usage']['percpu_usage']) * 100.0
+            cpu_percent = (cpu_delta / system_delta) * num_cpus * 100.0
             
         # Calculate memory usage
         mem_usage = stats['memory_stats']['usage']

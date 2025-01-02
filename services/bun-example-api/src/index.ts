@@ -2,12 +2,13 @@ import { serve } from "bun";
 
 const server = serve({
     port: 3000,
+    hostname: "0.0.0.0",
     async fetch(req) {
         const url = new URL(req.url);
         
         // Basic health check endpoint
         if (url.pathname === "/health") {
-            return new Response("OK", { status: 200 });
+            return new Response("OK!!", { status: 200 });
         }
 
         // Example API endpoint
@@ -26,4 +27,4 @@ const server = serve({
     },
 });
 
-console.log(`Server running at http://localhost:${server.port}`);
+console.log(`Server running at http://0.0.0.0:${server.port}`);
