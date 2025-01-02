@@ -3,10 +3,11 @@ import re
 import subprocess
 from datetime import datetime
 from typing import Dict, List, Tuple, Optional
+import json
 
 class CaddyManager:
     def __init__(self):
-        self.ssh_cmd_prefix = 'source .env && export SSHPASS=$HOST_SSH_PASSWORD && sshpass -e ssh -o StrictHostKeyChecking=no $HOST_SSH_USER@$DROPLET_IP'
+        self.ssh_cmd_prefix = 'cd .. && source .env && export SSHPASS=$HOST_SSH_PASSWORD && sshpass -e ssh -o StrictHostKeyChecking=no $HOST_SSH_USER@$DROPLET_IP'
         self.caddy_dir = '/etc/caddy'
         self.conf_d_dir = f'{self.caddy_dir}/conf.d'
 
@@ -41,8 +42,21 @@ class CaddyManager:
             if not main_success:
                 return {'error': f'Failed to fetch Caddy config: {main_error}'}
 
+            # Load custom directives from config
+            try:
+                with open('config.json', 'r') as f:
+                    config = json.load(f)
+                    custom_directives = config.get('caddy', {}).get('custom_directives', [])
+            except Exception:
+                custom_directives = []
+
             config = "# Main Caddyfile\n"
             config += main_content + "\n\n"
+
+            # Add custom directives if any
+            if custom_directives:
+                config += "# Custom Directives\n"
+                config += "\n".join(custom_directives) + "\n\n"
             
             # Get conf.d contents
             success, files, error = self.get_conf_d_files()
@@ -103,3 +117,17 @@ class CaddyManager:
         """Reload Caddy service"""
         success, stdout, stderr = self._run_ssh_command('sudo systemctl reload caddy')
         return success, stderr if not success else "Caddy reloaded successfully" 
+
+    def test_config(self) -> Dict:
+        """Test Caddy configuration using caddy validate"""
+        try:
+            cmd = f'sudo caddy validate --config {self.caddy_dir}/Caddyfile'
+            success, stdout, stderr = self._run_ssh_command(cmd)
+            
+            if success:
+                return {'success': True, 'message': 'Configuration is valid'}
+            else:
+                return {'success': False, 'message': f'Configuration validation failed: {stderr}'}
+                
+        except Exception as e:
+            return {'success': False, 'message': str(e)} 

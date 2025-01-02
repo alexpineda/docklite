@@ -200,6 +200,8 @@ def delete_container(name):
 @app.route('/deploy-machine-services')
 def deploy_machine_services():
     """Stream the output of deploying machine services"""
+    _prepare_services_vars(registry_manager.list_images(), write_to_file=True)
+
     return Response(
         stream_with_context(_stream_deployment(['playbook.yml', 'deploy.yml'])),
         mimetype='text/event-stream'
@@ -298,6 +300,14 @@ def cleanup_caddy_config():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/test-caddy-config')
+def test_caddy_config():
+    """Test the Caddy configuration"""
+    try:
+        result = caddy_manager.test_config()
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/service/<name>/env', methods=['GET'])
 def get_service_env(name):
