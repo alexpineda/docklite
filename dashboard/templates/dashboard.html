@@ -58,6 +58,70 @@
         </div>
     </div>
 
+    <div class="card mb-4">
+        <div class="card-body">
+            <h2 class="card-title">Global Configuration</h2>
+            <p class="text-muted">View and manage global configuration settings.</p>
+            
+            <button class="btn btn-link p-0" type="button" data-bs-toggle="collapse" data-bs-target="#globalConfig" aria-expanded="false" aria-controls="globalConfig">
+                Show Configuration <i class="bi bi-chevron-down"></i>
+            </button>
+            <div class="collapse mt-2" id="globalConfig">
+                <div class="card card-body bg-light">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6 class="mb-0">Configuration</h6>
+                        <div class="btn-group">
+                            <button class="btn btn-sm btn-outline-primary" onclick="saveGlobalConfig()">
+                                <i class="bi bi-save"></i> Save Changes
+                            </button>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6 class="border-bottom pb-2">Host Configuration</h6>
+                            <div class="mb-3">
+                                <label class="form-label">Host</label>
+                                <input type="text" class="form-control" id="config-host">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Port</label>
+                                <input type="text" class="form-control" id="config-port">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Username</label>
+                                <input type="text" class="form-control" id="config-username">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <h6 class="border-bottom pb-2">Filesystem</h6>
+                            <div class="mb-3">
+                                <label class="form-label">Host Path</label>
+                                <input type="text" class="form-control" id="config-filesystem-host-path">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Container Mount Path</label>
+                                <input type="text" class="form-control" id="config-filesystem-container-mount-path">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row mt-3">
+                        <div class="col-md-6">
+                            <h6 class="border-bottom pb-2">Registry Configuration</h6>
+                            <div class="mb-3">
+                                <label class="form-label">URL</label>
+                                <input type="text" class="form-control" id="config-registry-url">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Namespace</label>
+                                <input type="text" class="form-control" id="config-registry-namespace">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <h2>API Services</h2>
     
     {% if services %}
@@ -569,6 +633,75 @@ function testCaddyConfig() {
         .catch(error => {
             alert('Error testing Caddy configuration: ' + error);
         });
+}
+
+// Load global config when section is expanded
+document.getElementById('globalConfig').addEventListener('shown.bs.collapse', function () {
+    loadGlobalConfig();
+});
+
+function loadGlobalConfig() {
+    fetch('/global-config')
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                alert(`Error: ${data.error}`);
+                return;
+            }
+            
+            // Host Configuration
+            document.getElementById('config-host').value = data.host?.endpoint || '';
+            document.getElementById('config-port').value = data.host?.port || '';
+            document.getElementById('config-username').value = data.host?.username || '';
+            
+            // Filesystem
+            document.getElementById('config-filesystem-host-path').value = data.filesystem?.host_path || '';
+            document.getElementById('config-filesystem-container-mount-path').value = data.filesystem?.container_mount_path || '';
+            
+            // Registry
+            document.getElementById('config-registry-url').value = data.registry?.url || '';
+            document.getElementById('config-registry-namespace').value = data.registry?.namespace || '';
+        })
+        .catch(error => {
+            alert(`Error loading configuration: ${error}`);
+        });
+}
+
+function saveGlobalConfig() {
+    const config = {
+        host: {
+            endpoint: document.getElementById('config-host').value,
+            port: document.getElementById('config-port').value,
+            username: document.getElementById('config-username').value
+        },
+        filesystem: {
+            host_path: document.getElementById('config-filesystem-host-path').value,
+            container_mount_path: document.getElementById('config-filesystem-container-mount-path').value
+        },
+        registry: {
+            url: document.getElementById('config-registry-url').value,
+            namespace: document.getElementById('config-registry-namespace').value
+        }
+    };
+    
+    fetch('/global-config', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(config)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            alert(`Error: ${data.error}`);
+        } else {
+            alert('Configuration saved successfully');
+        }
+    })
+    .catch(error => {
+        alert(`Error saving configuration: ${error}`);
+    });
 }
 </script>
 

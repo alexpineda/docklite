@@ -4,15 +4,22 @@ from docker.errors import DockerException
 from typing import Optional, Dict
 from datetime import datetime
 
+from .file_paths import file_paths
+from .config_manager import ConfigManager
+
 class DockerManager:
     def __init__(self):
+        self.config_manager = ConfigManager()
         self.client = self._setup_docker_client()
     
     def _setup_docker_client(self) -> Optional[docker.DockerClient]:
         """Setup Docker client with TLS if configured"""
-        docker_host = os.getenv('DOCKER_HOST', f"tcp://{os.getenv('DROPLET_IP', 'localhost')}:2376")
+        ssh_host_config = self.config_manager.get_ssh_host_config()
+        docker_host = f"tcp://{ssh_host_config.get('endpoint')}:2376"
+        
+        # Check multiple possible certificate locations
         cert_locations = [
-            os.path.join(os.path.dirname(__file__), 'ansible', 'certs'),
+            os.path.join(file_paths['ansible_dir'], 'certs'),
             os.path.abspath(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'certs')),
             os.path.expanduser('~/.docker/machine/certs'),
         ]
@@ -20,18 +27,18 @@ class DockerManager:
         
         docker_kwargs = {}
         if os.getenv('DOCKER_TLS_VERIFY', '1') == '1':
-            cert_path = os.path.join(docker_cert_path, 'cert.pem')
-            key_path = os.path.join(docker_cert_path, 'key.pem')
+            client_cert_path = os.path.join(docker_cert_path, 'cert.pem')
+            client_key_path = os.path.join(docker_cert_path, 'key.pem')
             ca_path = os.path.join(docker_cert_path, 'ca.pem')
             
-            if not all(os.path.exists(p) for p in [cert_path, key_path, ca_path]):
+            if not all(os.path.exists(p) for p in [client_cert_path, client_key_path, ca_path]):
                 print(f"Warning: Missing certificates in {docker_cert_path}")
                 return None
                 
             docker_kwargs = {
                 'base_url': docker_host,
                 'tls': docker.tls.TLSConfig(
-                    client_cert=(cert_path, key_path),
+                    client_cert=(client_cert_path, client_key_path),
                     ca_cert=ca_path,
                     verify=True
                 )

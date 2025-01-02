@@ -16,7 +16,7 @@
 
     - name: Ensure host directories exist for each service
       file:
-        path: "/srv/docker/{{ item.name }}"
+        path: "{{ item.host_path }}"
         state: directory
         mode: '0755'
       loop: "{{ api_services }}"
@@ -35,10 +35,41 @@
         published_ports:
           - "127.0.0.1:3000:3000"
         volumes:
-          - "/srv/docker/{{ item.name }}:/var/lib/app_data"
+          - "{{ item.host_path }}:{{ item.container_mount_path }}"
         platform: "linux/amd64"
-        env: "{{ item.env_vars }}"
+        env: "{{ item.env_vars | default({}) | combine({'APP_MOUNT_PATH': item.container_mount_path}) }}"
       loop: "{{ api_services }}"
+
+    - name: Verify mount points for each service
+      block:
+        - name: Create test file in host directory
+          copy:
+            content: "Mount verification file - {{ ansible_date_time.iso8601 }}"
+            dest: "{{ item.host_path }}/mount-verify.txt"
+          loop: "{{ api_services }}"
+
+        - name: Verify test file is accessible inside container
+          shell: "docker exec {{ item.name }} cat {{ item.container_mount_path }}/mount-verify.txt"
+          register: verify_result
+          loop: "{{ api_services }}"
+          changed_when: false
+
+        - name: Show mount verification results
+          debug:
+            msg: "Mount verified for {{ item.item.name }}: file accessible in container at {{ item.item.container_mount_path }}"
+          loop: "{{ verify_result.results }}"
+          when: item.rc == 0
+
+        - name: Cleanup test files
+          file:
+            path: "{{ item.host_path }}/mount-verify.txt"
+            state: absent
+          loop: "{{ api_services }}"
+      rescue:
+        - name: Report mount verification failure
+          fail:
+            msg: "Mount verification failed. Please check container logs and mount configuration."
+          when: verify_result.failed is defined and verify_result.failed
 
     - name: Configure Caddy for each service
       template:

@@ -1,35 +1,28 @@
-import os
 import re
-import subprocess
 from datetime import datetime
-from typing import Dict, List, Tuple, Optional
-import json
+from typing import Dict, List, Tuple
+
+from .config_manager import ConfigManager
+from .ssh_manager import run_ssh_command
 
 class CaddyManager:
     def __init__(self):
-        self.ssh_cmd_prefix = 'cd .. && source .env && export SSHPASS=$HOST_SSH_PASSWORD && sshpass -e ssh -o StrictHostKeyChecking=no $HOST_SSH_USER@$DROPLET_IP'
         self.caddy_dir = '/etc/caddy'
         self.conf_d_dir = f'{self.caddy_dir}/conf.d'
 
-    def _run_ssh_command(self, cmd: str) -> Tuple[bool, str, str]:
-        """Run a command over SSH and return success, stdout, stderr"""
-        full_cmd = f'{self.ssh_cmd_prefix} "{cmd}"'
-        result = subprocess.run(full_cmd, shell=True, capture_output=True, text=True)
-        return result.returncode == 0, result.stdout, result.stderr
-
     def get_main_config(self) -> Tuple[bool, str, str]:
         """Get the contents of the main Caddyfile"""
-        return self._run_ssh_command(f'cat {self.caddy_dir}/Caddyfile')
+        return run_ssh_command(f'cat {self.caddy_dir}/Caddyfile')
 
     def get_conf_d_files(self) -> Tuple[bool, List[str], str]:
         """Get list of files in conf.d directory"""
-        success, stdout, stderr = self._run_ssh_command(f'ls -1 {self.conf_d_dir}')
+        success, stdout, stderr = run_ssh_command(f'ls -1 {self.conf_d_dir}')
         files = stdout.strip().split('\n') if stdout.strip() else []
         return success, files, stderr
 
     def get_conf_d_file_content(self, filename: str) -> Tuple[bool, str, str]:
         """Get contents of a specific conf.d file"""
-        return self._run_ssh_command(f'cat {self.conf_d_dir}/{filename}')
+        return run_ssh_command(f'cat {self.conf_d_dir}/{filename}')
 
     def get_full_config(self, active_domains: set) -> Dict:
         """
@@ -43,12 +36,7 @@ class CaddyManager:
                 return {'error': f'Failed to fetch Caddy config: {main_error}'}
 
             # Load custom directives from config
-            try:
-                with open('config.json', 'r') as f:
-                    config = json.load(f)
-                    custom_directives = config.get('caddy', {}).get('custom_directives', [])
-            except Exception:
-                custom_directives = []
+            custom_directives = ConfigManager().get_caddy_custom_directives()
 
             config = "# Main Caddyfile\n"
             config += main_content + "\n\n"

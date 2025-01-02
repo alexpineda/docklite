@@ -20,13 +20,7 @@
 ## Deployment
 There are two ways to deploy services:
 
-1. Using deploy.py directly:
-   ```bash
-   cd dashboard
-   python deploy.py
-   ```
-
-2. Using the web dashboard:
+1. Using the web dashboard:
    ```bash
    cd dashboard
    uv run app.py
@@ -44,19 +38,13 @@ Each service should:
 Service names and domains are derived from the image name:
    - Image: `registry.digitalocean.com/api-alexpineda-containers/my-api:latest`
    - Service name: `my-api`
-   - Domain: `my-api.{BASE_DOMAIN}`
+   - Domain: `my-api.my-domain.com`
 
 ## Dashboard
 - Runs locally on Mac
 - Connects to remote Docker daemon
 - Requires TLS certificates in ~/.docker/machine/certs/
 - Access at http://localhost:3000
-
-## Configuration
-- Services are discovered from Docker registry
-- Each service needs:
-  - To be pushed to the registry
-  - Follow naming convention: `registry.digitalocean.com/api-alexpineda-containers/{service-name}:latest`
 
 ## Security and Configuration
 
@@ -68,7 +56,12 @@ The following files contain sensitive information and are NOT included in the re
    - Fill in your actual values
    - Never commit this file
 
-2. `docker-config.json` - Docker registry authentication
+2. `config.json` - Configuration for the dashboard
+   - Copy `config.json.example` to `config.json`
+   - Fill in your actual values
+   - Never commit this file
+
+3. `docker-config.json` - Docker registry authentication
    - Copy `docker-config.json.example` to `docker-config.json`
    - Add your registry credentials
    - Never commit this file
@@ -83,6 +76,7 @@ The following files contain sensitive information and are NOT included in the re
    ```bash
    cp .env.example .env
    cp docker-config.json.example docker-config.json
+   cp config.json.example config.json
    ```
 
 2. Generate certificates:

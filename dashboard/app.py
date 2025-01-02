@@ -1,18 +1,17 @@
+from managers.config_manager import ConfigManager
 from flask import Flask, render_template, request, redirect, url_for, flash, Response, stream_with_context, jsonify
-import yaml
 import os
 from dotenv import load_dotenv
 from typing import Dict, List, Optional,  Generator
-from docker_manager import DockerManager
-from ansible_manager import AnsibleManager
-from doctl_registry_manager import RegistryManager
-from caddy_manager import CaddyManager
+from managers.docker_manager import DockerManager
+from managers.ansible_manager import AnsibleManager
+from managers.doctl_registry_manager import RegistryManager
+from managers.caddy_manager import CaddyManager
 import json
 from pathlib import Path
 
 # Load environment variables
 load_dotenv()
-
 
 # Initialize managers
 docker_manager = DockerManager()
@@ -72,12 +71,13 @@ def dashboard():
             error_message = f"Error connecting to Docker: {e}"
             print(error_message)
             
+    base_domain = ConfigManager().get_caddy_config().get('base_domain')
     return render_template('dashboard.html',
                          services=services,
                          orphaned_containers=orphaned_containers,
                          docker_available=docker_available,
                          error_message=error_message,
-                         base_domain=os.getenv('BASE_DOMAIN', 'alexpineda.ca'))
+                         base_domain=base_domain)
 
 def _stream_deployment(playbooks: str | list[str], extra_vars: Optional[str] = None) -> Generator[str, None, None]:
     """Generic deployment streaming function
@@ -87,20 +87,8 @@ def _stream_deployment(playbooks: str | list[str], extra_vars: Optional[str] = N
         extra_vars: Extra vars to apply to all playbooks
     """
     try:
-        docker_config, cleanup_files = ansible_manager.setup_deployment()
-        
-        if not os.path.exists(docker_config):
-            yield f"data: Error: Docker config file not found at {docker_config}\n\n"
-            return
-            
-        try:
-            # Update domain configuration
-            from deploy import update_domain_yaml
-            update_domain_yaml(ansible_manager.env)
-            yield "data: Updated domain configuration\n\n"
-        except Exception as e:
-            yield f"data: Warning: Could not update domain configuration: {str(e)}\n\n"
-            
+        cleanup_files = ansible_manager.setup_deployment()
+
         try:
             if isinstance(playbooks, str):
                 yield f"data: Starting deployment with {playbooks}...\n\n"
@@ -120,55 +108,6 @@ def _stream_deployment(playbooks: str | list[str], extra_vars: Optional[str] = N
     except Exception as e:
         yield f"data: Error: {str(e)}\n\n"
 
-
-
-def _prepare_service_vars(service_name: str, image: str, domain: str) -> dict:
-    """Prepare service configuration with env vars from config"""
-    try:
-        # Load config file
-        config_path = Path(__file__).parent / 'config.json'
-        with open(config_path) as f:
-            config = json.load(f)
-            
-        # Get env vars for service
-        service_config = config.get('services', {}).get(service_name, {})
-        env_vars = service_config.get('env_vars', {})
-        
-        return {
-            'name': service_name,
-            'image': image,
-            'domain': domain,
-            'env_vars': env_vars
-        }
-    except Exception as e:
-        print(f"Error loading env vars for {service_name}: {e}")
-        return {
-            'name': service_name,
-            'image': image,
-            'domain': domain,
-            'env_vars': {}
-        }
-
-def _prepare_services_vars(services: List[Dict[str, str]], write_to_file: bool = False) -> dict:
-    # Prepare service configs with env vars
-    service_configs = []
-    for service in services:
-        service_config = _prepare_service_vars(
-            service_name=service['name'],
-            image=service['image'],
-            domain=service['domain']
-        )
-        service_configs.append(service_config)
-    
-    # Create temporary vars file for all services
-    service_vars = {'api_services': service_configs}
-
-    temp_vars_file = os.path.join(ansible_manager.ansible_dir, 'vars', 'services_to_deploy.yml')
-    if write_to_file:
-        with open(temp_vars_file, 'w') as f:
-            yaml.dump(service_vars, f)
-
-    return service_vars
 
 @app.route('/container/<name>/restart', methods=['POST'])
 def restart_container(name):
@@ -200,7 +139,7 @@ def delete_container(name):
 @app.route('/deploy-machine-services')
 def deploy_machine_services():
     """Stream the output of deploying machine services"""
-    _prepare_services_vars(registry_manager.list_images(), write_to_file=True)
+    ansible_manager.prepare_services_vars(registry_manager.list_images(), write_to_file=True)
 
     return Response(
         stream_with_context(_stream_deployment(['playbook.yml', 'deploy.yml'])),
@@ -210,7 +149,7 @@ def deploy_machine_services():
 @app.route('/deploy-all-containers')
 def deploy_all_containers():
     """Stream the output of deploying all API services using deploy.yml"""
-    _prepare_services_vars(registry_manager.list_images(), write_to_file=True)
+    ansible_manager.prepare_services_vars(registry_manager.list_images(), write_to_file=True)
         
     return Response(
         stream_with_context(_stream_deployment('deploy.yml')),
@@ -229,7 +168,7 @@ def deploy_container():
     if not service:
         return Response("data: Error: Service not found in registry\n\n", mimetype='text/event-stream')
         
-    _prepare_services_vars([
+    ansible_manager.prepare_services_vars([
         {
             'name': service['name'],
             'image': service['image'],
@@ -306,6 +245,50 @@ def test_caddy_config():
     try:
         result = caddy_manager.test_config()
         return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/global-config')
+def get_global_config():
+    """Get global configuration settings"""
+    try:
+        config_path = Path(__file__).parent / 'config.json'
+        with open(config_path) as f:
+            config = json.load(f)
+            
+        # Remove services and caddy sections as they're managed separately
+        config_copy = config.copy()
+        config_copy.pop('services', None)
+        config_copy.pop('caddy', None)
+            
+        return jsonify(config_copy)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/global-config', methods=['POST'])
+def update_global_config():
+    """Update global configuration settings"""
+    try:
+        config_path = Path(__file__).parent / 'config.json'
+        
+        # Load existing config to preserve services and caddy sections
+        with open(config_path) as f:
+            current_config = json.load(f)
+        
+        # Get updated config from request
+        new_config = request.json
+        
+        # Preserve services and caddy sections from current config
+        if 'services' in current_config:
+            new_config['services'] = current_config['services']
+        if 'caddy' in current_config:
+            new_config['caddy'] = current_config['caddy']
+        
+        # Save updated config
+        with open(config_path, 'w') as f:
+            json.dump(new_config, f, indent=2)
+            
+        return jsonify({'message': 'Configuration updated successfully'})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

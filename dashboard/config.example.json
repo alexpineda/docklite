@@ -1,7 +1,11 @@
 {
-  "host": "myhost.com",
-  "port": "22",
-  "username": "root",
+  "ssh_host": {
+    "endpoint": "myhost.com",
+    "port": "22",
+    "username": "root",
+    "password": "optional password",
+    "ssh_key": "~/.ssh/id_rsa"
+  },
   "filesystem": {
     "host_path": "/srv/docker",
     "container_mount_path": "/srv/docker"

@@ -1,11 +1,13 @@
-import os
 import subprocess
 from typing import Dict, List
 
+from .config_manager import ConfigManager
+
 class RegistryManager:
     def __init__(self):
-        self.registry_url = os.getenv('REGISTRY_URL', 'registry.digitalocean.com')
-        self.registry_namespace = os.getenv('REGISTRY_NAMESPACE', 'api-alexpineda-containers')
+        self.config_manager = ConfigManager()
+        self.registry_url = self.config_manager.get_registry_config().get('url')
+        self.registry_namespace = self.config_manager.get_registry_config().get('namespace')
         
     def list_images(self) -> List[Dict[str, str]]:
         """List all images in the registry namespace"""
@@ -40,7 +42,7 @@ class RegistryManager:
                         services.append({
                             'name': name,
                             'image': image,
-                            'domain': f"{name}.{os.getenv('BASE_DOMAIN')}"
+                            'domain': f"{name}.{self.config_manager.get_caddy_config().get('base_domain')}"
                         })
                 except Exception as e:
                     print(f"Error getting tags for repository {repo['name']}: {e}")
