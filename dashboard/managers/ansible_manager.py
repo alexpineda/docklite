@@ -3,17 +3,39 @@ import os
 import subprocess
 from typing import Dict, List, Optional, Generator, Tuple
 import yaml
+import re
 
 from .file_paths import file_paths
 from .config_manager import ConfigManager
+from .caddy_manager import CaddyManager
 
 from pathlib import Path
 
 class AnsibleManager:
     def __init__(self):
         self.config_manager = ConfigManager()
+        self.caddy_manager = CaddyManager()
 
-    def prepare_service_vars(self, service_name: str, image: str, domain: str) -> dict:
+    def _get_existing_port_offsets(self) -> Dict[str, int]:
+        """Get existing port offsets from Caddy configurations"""
+        port_offsets = {}
+        success, files, _ = self.caddy_manager.get_conf_d_files()
+        
+        if success and files:
+            for file in files:
+                # Domain is the filename without extension
+                domain = os.path.splitext(file)[0]
+                success, content, _ = self.caddy_manager.get_conf_d_file_content(file)
+                if success:
+                    # Look for reverse_proxy lines with port numbers
+                    matches = re.findall(r'reverse_proxy localhost:(\d+)', content)
+                    if matches:
+                        port = int(matches[0])
+                        port_offsets[domain] = port - 3000
+                            
+        return port_offsets
+
+    def prepare_service_vars(self, service_name: str, image: str, domain: str, port_offset: int = 0) -> dict:
         """Prepare service configuration with env vars and mount paths from config"""
         
         # Get env vars for service
@@ -31,17 +53,32 @@ class AnsibleManager:
             'domain': domain,
             'env_vars': env_vars,
             'host_path': f"{host_path}/{service_name}",
-            'container_mount_path': f"{container_mount_path}/{service_name}"
+            'container_mount_path': f"{container_mount_path}/{service_name}",
+            'port_offset': port_offset
         }
         
     def prepare_services_vars(self, services: List[Dict[str, str]], write_to_file: bool = False) -> dict:
+        # Get existing port offsets from Caddy configs
+        existing_port_offsets = self._get_existing_port_offsets()
+        used_port_offsets = set(existing_port_offsets.values())
+        next_available_offset = max(used_port_offsets, default=-1) + 1
+        
         # Prepare service configs with env vars
         service_configs = []
         for service in services:
+            # Try to get existing port offset from Caddy config
+            port_offset = existing_port_offsets.get(service['domain'])
+            
+            # If no existing port offset, use next available
+            if port_offset is None:
+                port_offset = next_available_offset
+                next_available_offset += 1
+            
             service_config = self.prepare_service_vars(
                 service_name=service['name'],
                 image=service['image'],
-                domain=service['domain']
+                domain=service['domain'],
+                port_offset=port_offset
             )
             service_configs.append(service_config)
         

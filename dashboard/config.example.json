@@ -8,7 +8,8 @@
   },
   "filesystem": {
     "host_path": "/srv/docker",
-    "container_mount_path": "/srv/docker"
+    "container_mount_path": "/srv/docker",
+    "mount_env_var": "APP_MOUNT_PATH"
   },
   "caddy": {
     "email": "your-email@example.com",

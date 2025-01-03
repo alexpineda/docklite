@@ -33,7 +33,7 @@
         networks:
           - name: "{{ docker_network }}"
         published_ports:
-          - "127.0.0.1:3000:3000"
+          - "127.0.0.1:{{ 3000 + item.port_offset }}:3000"
         volumes:
           - "{{ item.host_path }}:{{ item.container_mount_path }}"
         platform: "linux/amd64"

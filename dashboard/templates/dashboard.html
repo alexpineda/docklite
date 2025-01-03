@@ -650,9 +650,9 @@ function loadGlobalConfig() {
             }
             
             // Host Configuration
-            document.getElementById('config-host').value = data.host?.endpoint || '';
-            document.getElementById('config-port').value = data.host?.port || '';
-            document.getElementById('config-username').value = data.host?.username || '';
+            document.getElementById('config-host').value = data.ssh_host?.endpoint || '';
+            document.getElementById('config-port').value = data.ssh_host?.port || '';
+            document.getElementById('config-username').value = data.ssh_host?.username || '';
             
             // Filesystem
             document.getElementById('config-filesystem-host-path').value = data.filesystem?.host_path || '';
@@ -669,7 +669,7 @@ function loadGlobalConfig() {
 
 function saveGlobalConfig() {
     const config = {
-        host: {
+        ssh_host: {
             endpoint: document.getElementById('config-host').value,
             port: document.getElementById('config-port').value,
             username: document.getElementById('config-username').value

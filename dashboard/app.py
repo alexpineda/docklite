@@ -8,6 +8,7 @@ from managers.ansible_manager import AnsibleManager
 from managers.doctl_registry_manager import RegistryManager
 from managers.caddy_manager import CaddyManager
 import json
+import docker
 from pathlib import Path
 
 # Load environment variables
@@ -41,12 +42,20 @@ def dashboard():
                 container = next((c for c in containers if c.name == service['name']), None)
                 if container:
                     matched_containers.add(container.id)
+                    
+                    # Check for image mismatch
+                    try:    
+                        latest_image = docker_manager.client.images.get(service['image'])
+                        image_mismatch = container.image.id != latest_image.id
+                    except docker.errors.ImageNotFound:
+                        image_mismatch = True  # Image not found, consider it a mismatch
+                    
                     service.update({
                         'status': container.status,
                         'running': container.status == 'running',
                         'logs': container.logs(tail=5).decode('utf-8').split('\n'),
                         'deployed': True,
-                        'image_mismatch': False  # Simplified for brevity
+                        'image_mismatch': image_mismatch
                     })
                 else:
                     service.update({
@@ -168,13 +177,8 @@ def deploy_container():
     if not service:
         return Response("data: Error: Service not found in registry\n\n", mimetype='text/event-stream')
         
-    ansible_manager.prepare_services_vars([
-        {
-            'name': service['name'],
-            'image': service['image'],
-            'domain': service['domain']
-        }
-    ], write_to_file=True)
+    # Use the full service configuration instead of creating a simplified one
+    ansible_manager.prepare_services_vars([service], write_to_file=True)
     
     return Response(
         stream_with_context(_stream_deployment('deploy.yml')),
