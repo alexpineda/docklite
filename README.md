@@ -1,4 +1,6 @@
-# Ansible API Deployment Setup
+# DockLite
+
+An ansible deployment setup for a single VPS to deploy micro apis via docker. WIP.
 
 ## Architecture
 - Local Flask dashboard for monitoring
